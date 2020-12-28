@@ -1,0 +1,142 @@
+<!-- Please, try to limit yourself to using only eighty characters per line. -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <script>
+        PullJson("https://api.jsonbin.io/b/5fe93b276c160b7b70da494c")
+
+        function PullJson(url) {
+            let req = new XMLHttpRequest();
+            req.onreadystatechange = () => {
+                if (req.readyState == XMLHttpRequest.DONE) {
+                    const json_string = req.responseText;
+                    const json_object = JSON.parse(json_string);
+                    renderJson(json_object)
+                }
+            };
+            req.open("GET", url, true);
+            req.send();
+        }
+
+        function renderJson(json_object) {
+            const n_rows = json_object.items
+            const n_cols = json_object.depth + 5 // add 5 columns for our properties of interest
+            tableCreate(n_rows + 1, n_cols); // add a row for headers
+            populateTable(json_object.task_hierarchy, json_object.depth)
+            document.getElementById("author_info").innerHTML = "<A HREF='mailto:" + json_object.email + "?SUBJECT=Centrale Planning'>" + json_object.author + "</A>";
+        }   
+
+        function tableCreate(n_rows, n_cols) {
+            var body = document.body,
+                tbl = document.createElement('table');
+            tbl.style.width = '100%';
+            tbl.style.border = '1px solid black';
+            tbl.setAttribute('id', 'mainTable')
+            for (var i = 0; i < n_rows; i++) {
+                var tr = tbl.insertRow();
+                for (var j = 0; j < n_cols; j++) {
+                    var td = tr.insertCell();
+                    //td.appendChild(document.createTextNode('__'));
+                    td.style.border = '1px solid black';
+                }
+            }
+            body.appendChild(tbl);
+        }
+
+        function populateTable(tasks, depth) {
+            /* Filling the table with data consists of the following steps:
+               A) Initialization (get table, fill headers)
+               B) Filling content (1 Fill, 2 Note progress, 3 Find next)
+            */
+
+            // A) Initialization: 
+            // Get the table we will be assigning to.
+            tbl = document.getElementById("mainTable")
+
+            // Start with headers
+            headers = ["#", "##", "start", "finish", "note", "directory"];
+            for (i = 0; i < headers.length; i++) {
+                tbl.rows[0].cells[i].innerHTML = headers[i]
+            }
+
+            // B) Fill content:
+            // Counters to keep track of progress.
+            var c = [0];
+            var row_c = 1
+
+            // We will fill as long as a task is available.
+            var task = tasks[0];
+            task.parent = {}; task.parent.children = tasks;
+            while (task) {
+                // B1) Fill the appropriate cell and increment the counter.
+                // a. Name
+                tbl.rows[row_c].cells[c.length - 1].innerHTML = task.name;
+                // b. Start
+                let curCel = tbl.rows[row_c].cells[depth];
+                if (task.start_realized != "NA") {
+                    curCel.innerHTML = task.start_realized;
+                } else {
+                    curCel.innerHTML = task.start_projected;
+                }
+                // c. Finish
+                curCel = tbl.rows[row_c].cells[depth + 1];
+                if (task.finish_realized != "NA") {
+                    curCel.innerHTML = task.finish_realized;
+                } else {
+                    curCel.innerHTML = task.finish_projected;
+                    if (task.is_deadline) {
+                        curCel.style.color = "red";
+                    }
+                    curCel.style.color = "gray";
+                }
+                // d. Notes
+                tbl.rows[row_c].cells[depth + 3].innerHTML = task.Notes;
+                // e. Directory
+                tbl.rows[row_c].cells[depth + 4].innerHTML = task.Directory;
+
+
+                // B2) Note that we're done filling the cell.
+                c[c.length - 1]++;
+                row_c++;
+
+
+                // B3) Now find out what our next task will be.
+                if (task.children.length > 0) {
+                    // If there is a child...
+                    c.push(0)
+                    task.children[0].parent = task
+                    task = task.children[0]
+                } else {
+                    while (true) {
+                        if (!task.parent) {
+                            // If there is no parent we are done.
+                            task = false;
+                            break;
+                        } else if (c.slice(-1) < task.parent.children.length) {
+                            // If there is a sibling, it's next.
+                            let parent = task.parent;
+                            task = parent.children[c.slice(-1)];
+                            task.parent = parent;
+                            break
+                        } else {
+                            // If there is a parent, go up, then try sibling.
+                            c.slice(-1).pop;
+                            task = task.parent;
+                        } 
+                    }
+                }
+            }
+        }
+    </script>
+
+</head>
+
+
+
+<body>
+    <h2>Centrale planning</h2>
+    <p id="author_info"></p>
+    <p id="contact_info"></p>
+</body>
+</html>
